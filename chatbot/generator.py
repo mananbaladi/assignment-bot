@@ -1,4 +1,16 @@
-prompt = f"""You are a professional academic writer for SZABIST university Pakistan.
+import os
+import re
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def generate_assignment(info):
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        return None
+
+    prompt = f"""You are a professional academic writer for SZABIST university Pakistan.
 
 Write a complete university assignment on the topic below.
 
@@ -19,3 +31,34 @@ STRICT RULES:
 10. End with REFERENCES section with 3 academic references
 
 Begin writing now:"""
+
+    try:
+        response = requests.post(
+            "https://models.inference.ai.azure.com/chat/completions",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "gpt-4o",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 3500,
+                "temperature": 0.7
+            },
+            timeout=90
+        )
+        if response.status_code == 200:
+            data = response.json()
+            text = data["choices"][0]["message"]["content"]
+            text = re.sub(r'\*{1,3}', '', text)
+            text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+            text = re.sub(r'^-{3,}$', '', text, flags=re.MULTILINE)
+            text = text.replace('\u201c', '"').replace('\u201d', '"')
+            text = text.replace('\u2018', "'").replace('\u2019', "'")
+            text = text.replace('\u2013', '-').replace('\u2014', '-')
+            text = text.replace('\u2026', '...')
+            return text.strip()
+        else:
+            return None
+    except Exception as e:
+        return None
